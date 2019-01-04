@@ -362,9 +362,15 @@ namespace FlowConditionHelper
         /// /// <param name="conditionXml"></param>
         private string GenerateCondition(string attributeName, string operatorType, string value, string conditionXml)
         {
+            #region Helper attribute declaration
             string conditiontoAppend = "";
-            bool isGuidOrInt = false;
+            bool isInt = false;
             int intVal;
+            string onorafter;
+            string before;
+            string nextdateValue;
+            #endregion
+
             switch (operatorType)
             {
                 case "in":
@@ -376,19 +382,20 @@ namespace FlowConditionHelper
                     int count = 0;
                     foreach (XElement element in values)
                     {
+                        isInt = false;
                         if (count > 0) conditiontoAppend += ",";
 
                         if (element.Value.StartsWith("{") && element.Value.EndsWith("}"))
                         {
-                            value = element.Value.Replace("{", "'").Replace("}", "'").ToLower();
-                            isGuidOrInt = true;
+                            value = element.Value.Replace("{", "").Replace("}", "").ToLower();
                         }
                         else
                         {
-                            isGuidOrInt = true;
+                            isInt = true;
                             value = element.Value;
                         }
 
+                        if (!isInt) value = string.Format("'{0}'", value);
                         conditiontoAppend += FlowOperators.equals.Replace("<attributename>", attributeName)
                             .Replace("<value>", value);
 
@@ -400,26 +407,24 @@ namespace FlowConditionHelper
                     conditiontoAppend = FlowOperators.equals;
                     if (value.StartsWith("{") && value.EndsWith("}"))
                     {
-                        isGuidOrInt = true;
-                        value = value.Replace("{", "'").Replace("}", "'").ToLower();
+                        value = value.Replace("{", "").Replace("}", "").ToLower();
                     }
 
                     if(int.TryParse(value,out intVal)) // room to improve to check against field name meta data
                     {
-                        isGuidOrInt = true;
+                        isInt = true;
                     }
                     break;
                 case "ne":
                     conditiontoAppend = FlowOperators.doesnotequal;
                     if (value.StartsWith("{") && value.EndsWith("}"))
                     {
-                        isGuidOrInt = true;
-                        value = value.Replace("{", "'").Replace("}", "'").ToLower();
+                        value = value.Replace("{", "").Replace("}", "").ToLower();
                     }
 
                     if (int.TryParse(value, out intVal)) // room to improve to check against field name meta data
                     {
-                        isGuidOrInt = true;
+                        isInt = true;
                     }
                     break;
                 case "null":
@@ -434,28 +439,28 @@ namespace FlowConditionHelper
                     conditiontoAppend = FlowOperators.greaterthan;
                     if (int.TryParse(value, out intVal))
                     {
-                        isGuidOrInt = true;
+                        isInt = true;
                     }
                     break;
                 case "ge":
                     conditiontoAppend = FlowOperators.greaterthanOrEqual;
                     if (int.TryParse(value, out intVal))
                     {
-                        isGuidOrInt = true;
+                        isInt = true;
                     }
                     break;
                 case "lt":
                     conditiontoAppend = FlowOperators.lessthan;
                     if (int.TryParse(value, out intVal))
                     {
-                        isGuidOrInt = true;
+                        isInt = true;
                     }
                     break;
                 case "le":
                     conditiontoAppend = FlowOperators.lessthanOrEqual;
                     if (int.TryParse(value, out intVal))
                     {
-                        isGuidOrInt = true;
+                        isInt = true;
                     }
                     break;
                 case "begins-with":
@@ -501,14 +506,22 @@ namespace FlowConditionHelper
                     value = value.Replace("%", "");
                     break;
                 case "on":
-                    conditiontoAppend = FlowOperators.equals;
+                    onorafter = FlowOperators.greaterthanOrEqual;
+                    before = FlowOperators.lessthan;
                     //remove time part from value
                     value = getDatePartFromString(value);
+                    nextdateValue = string.Format("'{0}'", getNextDatePartFromString(value));
+                    before = before.Replace("<value>", nextdateValue);
+                    conditiontoAppend = string.Format("and({0},{1})", onorafter, before);
                     break;
                 case "not-on":
-                    conditiontoAppend = FlowOperators.doesnotequal;
+                    onorafter = FlowOperators.greaterthanOrEqual;
+                    before = FlowOperators.lessthan;
                     //remove time part from value
                     value = getDatePartFromString(value);
+                    nextdateValue = string.Format("'{0}'", getNextDatePartFromString(value));
+                    onorafter = onorafter.Replace("<value>", nextdateValue);
+                    conditiontoAppend = string.Format("and({0},{1})", before, onorafter);
                     break;
                 case "on-or-after":
                     conditiontoAppend = FlowOperators.greaterthanOrEqual;
@@ -526,7 +539,7 @@ namespace FlowConditionHelper
                     break;
             }
 
-            if (!isGuidOrInt) value = string.Format("'{0}'", value);
+            if (!isInt) value = string.Format("'{0}'", value);
             return conditiontoAppend.Replace("<attributename>", attributeName).Replace("<value>", value);
         }
 
@@ -579,7 +592,26 @@ namespace FlowConditionHelper
             {
                 //remove time part from value
                 DateTime date = Convert.ToDateTime(value).Date;
-                value = date.ToShortDateString();
+                value = date.ToString("yyyy-MM-dd");
+                return value;
+            }
+            catch (Exception e)
+            {
+                return value;
+            }
+        }
+
+        /// <summary>
+        /// This method removes the time part from a date time string and returns the next day value
+        /// </summary>
+        /// <param name="value"></param>
+        private string getNextDatePartFromString(string value)
+        {
+            try
+            {
+                //remove time part from value
+                DateTime date = Convert.ToDateTime(value).Date.AddDays(1);
+                value = date.ToString("yyyy-MM-dd");
                 return value;
             }
             catch (Exception e)
