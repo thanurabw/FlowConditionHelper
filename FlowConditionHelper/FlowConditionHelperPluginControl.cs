@@ -363,6 +363,8 @@ namespace FlowConditionHelper
         private string GenerateCondition(string attributeName, string operatorType, string value, string conditionXml)
         {
             string conditiontoAppend = "";
+            bool isGuidOrInt = false;
+            int intVal;
             switch (operatorType)
             {
                 case "in":
@@ -378,10 +380,12 @@ namespace FlowConditionHelper
 
                         if (element.Value.StartsWith("{") && element.Value.EndsWith("}"))
                         {
-                            value = element.Value.Replace("{", "").Replace("}", "").ToLower();
+                            value = element.Value.Replace("{", "'").Replace("}", "'").ToLower();
+                            isGuidOrInt = true;
                         }
                         else
                         {
+                            isGuidOrInt = true;
                             value = element.Value;
                         }
 
@@ -394,9 +398,29 @@ namespace FlowConditionHelper
                     break;
                 case "eq":
                     conditiontoAppend = FlowOperators.equals;
+                    if (value.StartsWith("{") && value.EndsWith("}"))
+                    {
+                        isGuidOrInt = true;
+                        value = value.Replace("{", "'").Replace("}", "'").ToLower();
+                    }
+
+                    if(int.TryParse(value,out intVal)) // room to improve to check against field name meta data
+                    {
+                        isGuidOrInt = true;
+                    }
                     break;
                 case "ne":
-                    conditiontoAppend = FlowOperators.equals;
+                    conditiontoAppend = FlowOperators.doesnotequal;
+                    if (value.StartsWith("{") && value.EndsWith("}"))
+                    {
+                        isGuidOrInt = true;
+                        value = value.Replace("{", "'").Replace("}", "'").ToLower();
+                    }
+
+                    if (int.TryParse(value, out intVal)) // room to improve to check against field name meta data
+                    {
+                        isGuidOrInt = true;
+                    }
                     break;
                 case "null":
                     conditiontoAppend = FlowOperators.equals;
@@ -408,15 +432,31 @@ namespace FlowConditionHelper
                     break;
                 case "gt":
                     conditiontoAppend = FlowOperators.greaterthan;
+                    if (int.TryParse(value, out intVal))
+                    {
+                        isGuidOrInt = true;
+                    }
                     break;
                 case "ge":
                     conditiontoAppend = FlowOperators.greaterthanOrEqual;
+                    if (int.TryParse(value, out intVal))
+                    {
+                        isGuidOrInt = true;
+                    }
                     break;
                 case "lt":
                     conditiontoAppend = FlowOperators.lessthan;
+                    if (int.TryParse(value, out intVal))
+                    {
+                        isGuidOrInt = true;
+                    }
                     break;
                 case "le":
                     conditiontoAppend = FlowOperators.lessthanOrEqual;
+                    if (int.TryParse(value, out intVal))
+                    {
+                        isGuidOrInt = true;
+                    }
                     break;
                 case "begins-with":
                     conditiontoAppend = FlowOperators.startsWith;
@@ -431,10 +471,34 @@ namespace FlowConditionHelper
                     conditiontoAppend = FlowOperators.doesnotendwith;
                     break;
                 case "like":
-                    conditiontoAppend = FlowOperators.contains;
+                    if(!value.StartsWith("%") && !value.EndsWith("%"))
+                    {
+                        conditiontoAppend = FlowOperators.contains;
+                    }
+                    else if (!value.StartsWith("%") && value.EndsWith("%"))
+                    {
+                        conditiontoAppend = FlowOperators.startsWith;
+                    }
+                    else if (value.StartsWith("%") && !value.EndsWith("%"))
+                    {
+                        conditiontoAppend = FlowOperators.endswith;
+                    }
+                    value = value.Replace("%", "");
                     break;
                 case "not-like":
-                    conditiontoAppend = FlowOperators.doesnotcontain;
+                    if (!value.StartsWith("%") && !value.EndsWith("%"))
+                    {
+                        conditiontoAppend = FlowOperators.doesnotcontain;
+                    }
+                    else if (!value.StartsWith("%") && value.EndsWith("%"))
+                    {
+                        conditiontoAppend = FlowOperators.doesnotstartWith;
+                    }
+                    else if (value.StartsWith("%") && !value.EndsWith("%"))
+                    {
+                        conditiontoAppend = FlowOperators.doesnotendwith;
+                    }
+                    value = value.Replace("%", "");
                     break;
                 case "on":
                     conditiontoAppend = FlowOperators.equals;
@@ -461,6 +525,8 @@ namespace FlowConditionHelper
                     throw new Exception(error);
                     break;
             }
+
+            if (!isGuidOrInt) value = string.Format("'{0}'", value);
             return conditiontoAppend.Replace("<attributename>", attributeName).Replace("<value>", value);
         }
 
